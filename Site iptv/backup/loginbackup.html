@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FONTESSTREAM - Painel Cliente/Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body {
+  margin: 0;
+  font-family: Arial,sans-serif;
+  background: url("fundo.jpg") no-repeat center center fixed;
+  background-size: cover;
+  color: white;
+  transition: 0.3s;
+}
+body.dark { background: #0d0d0d; color: white; }
+
+.top {background: linear-gradient(90deg,#e50914,#f40612); color:white; padding:25px; text-align:center; font-weight:bold; font-size:22px; box-shadow:0 4px 10px rgba(0,0,0,0.5);}
+.toggle-theme {position:fixed; top:20px; right:20px; z-index:1000; background:#ff9800; border-radius:50%; border:none; padding:10px 14px; font-size:18px; cursor:pointer; transition:0.3s;}
+.toggle-theme:hover { transform: scale(1.1); background:#fb8c00; }
+
+/* MENU LATERAL */
+.container{display:flex; max-width:1200px; margin:20px auto;}
+.menu{width:220px; background:#1f1f1f; border-radius:15px; padding:15px; flex-shrink:0; display:flex; flex-direction:column;}
+.menu button{background:#e50914;color:white;border:none;padding:12px;margin-bottom:10px;border-radius:25px;font-weight:bold;cursor:pointer;transition:0.3s;}
+.menu button:hover{opacity:0.85;}
+
+/* ÁREA PRINCIPAL */
+.main{flex:1;margin-left:20px;}
+.card-info,.destaque,.chat-box,.card-admin{background:#1f1f1f;border-radius:15px;padding:20px;margin-bottom:20px;box-shadow:0 6px 20px rgba(0,0,0,0.5);color:white;}
+.card-info h4,.destaque h3,.card-admin h4{color:#e50914;margin-bottom:10px;}
+button.botaoSecundario{background:#25d366;}
+.destaque h3{color:#ff9800;font-size:18px;}
+.destaque input,.destaque textarea{background:#2a2a2a;border-radius:15px;padding:12px;width:100%;color:white;margin-bottom:10px;}
+.destaque button{background:#e50914;color:white;padding:12px 15px;border-radius:25px;font-weight:bold;width:100%;}
+
+/* CHAT */
+.chat-box{max-height:400px;overflow-y:auto;display:flex;flex-direction:column;position:relative;}
+.chat-message{padding:8px 12px;border-radius:15px;margin-bottom:8px;max-width:70%;}
+.chat-message.user{background:#25d366;color:white;align-self:flex-end;}
+.chat-message.admin{background:#e50914;color:white;align-self:flex-start;}
+.chat-input{display:flex;margin-top:10px;}
+.chat-input input{flex:1;padding:10px;border-radius:25px;border:none;margin-right:10px;background:#2a2a2a;color:white;}
+.chat-input button{padding:10px 15px;border-radius:25px;border:none;background:#e50914;color:white;cursor:pointer;}
+
+/* DASHBOARD FLEX */
+.dashboard{display:flex;flex-wrap:wrap;justify-content:space-between;}
+.dashboard .card-info{width:30%;}
+
+/* DARK MODE */
+body.dark .card-info,body.dark .destaque,body.dark textarea,body.dark input,body.dark .card-admin{background:#222;color:white;}
+</style>
+</head>
+<body>
+<div class="top">FONTESSTREAM IPTV - Painel Longo</div>
+<button class="toggle-theme" onclick="toggleTema()">🌙</button>
+
+<!-- LOGIN -->
+<div class="card-login" id="loginCard" style="max-width:400px;margin:40px auto;">
+<input id="usuario" placeholder="Usuário">
+<input id="senha" type="password" placeholder="Senha">
+<button onclick="entrar()">Entrar Cliente</button>
+<button onclick="entrarAdmin()">Entrar Admin</button>
+<button class="voltar" onclick="location.href='index.html'">⬅ Menu Inicial</button>
+</div>
+
+<!-- PAINEL -->
+<div class="container" id="painel" style="display:none;">
+  <div class="menu" id="menu"></div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+// ---------- DADOS INICIAIS ----------
+const adminUser="admin";
+const adminPass="admin123";
+if(!localStorage.getItem("clientes")){
+  localStorage.setItem("clientes",JSON.stringify([
+    {usuario:"joao",senha:"123456",dataCadastro:"2026-01-10",validade:"2026-02-10",plano:"Mensal",valor:"R$30,00",pontos:10,desafios:1,sugestoes:[],duvidas:[],chat:[]}
+  ]));
+}
+
+let clienteLogado=null;
+let modoAdmin=false;
+let usuarioChat=null;
+
+// ---------- LOGIN ----------
+function entrar(){
+  let lista=JSON.parse(localStorage.getItem("clientes")||"[]");
+  let u=document.getElementById("usuario").value;
+  let s=document.getElementById("senha").value;
+  let c=lista.find(cli=>cli.usuario===u && cli.senha===s);
+  if(c){ clienteLogado=c; modoAdmin=false; abrirPainel(); } else alert("Usuário ou senha incorretos");
+}
+function entrarAdmin(){
+  let u=document.getElementById("usuario").value;
+  let s=document.getElementById("senha").value;
+  if(u===adminUser && s===adminPass){ modoAdmin=true; abrirPainel(); } else alert("Usuário ou senha incorretos");
+}
+
+// ---------- ABRIR PAINEL ----------
+function abrirPainel(){
+  document.getElementById("loginCard").style.display="none";
+  document.getElementById("painel").style.display="flex";
+  montarMenu();
+  mostrarSecao(modoAdmin?"dashboardAdmin":"dashboardCliente");
+}
+
+// ---------- MENU ----------
+function montarMenu(){
+  const menu=document.getElementById("menu");
+  menu.innerHTML="";
+  if(modoAdmin){
+    menu.innerHTML=`
+      <button onclick="mostrarSecao('dashboardAdmin')">Dashboard Clientes</button>
+      <button onclick="mostrarSecao('sugestoesAdmin')">Sugestões</button>
+      <button onclick="mostrarSecao('duvidasAdmin')">Dúvidas</button>
+      <button onclick="mostrarSecao('chatAdmin')">Chats</button>
+      <button onclick="sair()">Sair</button>
+    `;
+  }else{
+    menu.innerHTML=`
+      <button onclick="mostrarSecao('dashboardCliente')">Dashboard</button>
+      <button onclick="mostrarSecao('sugestoesCliente')">Sugestões</button>
+      <button onclick="mostrarSecao('duvidasCliente')">Dúvidas</button>
+      <button onclick="mostrarSecao('chatCliente')">Suporte</button>
+      <button onclick="sair()">Sair</button>
+    `;
+  }
+}
+
+// ---------- MOSTRAR SEÇÃO ----------
+function mostrarSecao(secao){
+  const main=document.getElementById("main");
+  main.innerHTML="";
+  if(modoAdmin){
+    if(secao==="dashboardAdmin") dashboardAdmin(main);
+    else if(secao==="sugestoesAdmin") sugestoesAdmin(main);
+    else if(secao==="duvidasAdmin") duvidasAdmin(main);
+    else if(secao==="chatAdmin") chatAdmin(main);
+  }else{
+    if(secao==="dashboardCliente") dashboardCliente(main);
+    else if(secao==="sugestoesCliente") sugestoesCliente(main);
+    else if(secao==="duvidasCliente") duvidasCliente(main);
+    else if(secao==="chatCliente") chatCliente(main);
+  }
+}
+
+// ---------- CLIENTE ----------
+function dashboardCliente(main){
+  let hoje=new Date();
+  let validade=new Date(clienteLogado.validade);
+  let diff=Math.ceil((validade-hoje)/(1000*60*60*24));
+  main.innerHTML=`
+  <div class="card-info"><h4>Plano</h4><p>${clienteLogado.plano} - ${clienteLogado.valor}</p></div>
+  <div class="card-info"><h4>Data de Cadastro</h4><p>${clienteLogado.dataCadastro}</p></div>
+  <div class="card-info"><h4>Validade</h4><p>${clienteLogado.validade} (${diff>0?diff+" dias restantes":"Plano expirado"})</p></div>
+  <div class="card-info"><h4>Pontos</h4><p>${clienteLogado.pontos}</p></div>
+  <div class="card-info"><h4>Desafios</h4><p>${clienteLogado.desafios}</p></div>
+  <button class="botaoSecundario" onclick="renovarPlano()">Renovar Plano</button>
+  `;
+}
+function sugestoesCliente(main){
+  main.innerHTML=`
+    <div class="destaque"><h3>💡 Sugestões</h3>
+    <input id="novaSugestao" placeholder="Digite sua sugestão">
+    <button onclick="adicionarSugestao()">Enviar</button>
+    <ul id="listaSugestoes"></ul>
+    </div>`;
+  atualizarSugestoes();
+}
+function duvidasCliente(main){
+  main.innerHTML=`
+    <div class="destaque"><h3>❓ Dúvidas</h3>
+    <textarea id="duvida" placeholder="Digite sua dúvida"></textarea>
+    <button onclick="enviarDuvida()">Enviar</button>
+    </div>`;
+}
+function chatCliente(main){
+  main.innerHTML=`
+    <div class="chat-box" id="chatBoxCliente">
+      <div id="mensagensChatCliente"></div>
+      <div class="chat-input">
+        <input id="mensagemInputCliente" placeholder="Digite sua mensagem...">
+        <button onclick="enviarMensagemCliente()">Enviar</button>
+      </div>
+    </div>`;
+  atualizarChatCliente();
+}
+
+// ---------- ADMIN ----------
+function dashboardAdmin(main){
+  let lista=JSON.parse(localStorage.getItem("clientes")||"[]");
+  main.innerHTML="";
+  lista.forEach((c,i)=>{
+    let div=document.createElement("div"); div.className="card-admin";
+    div.innerHTML=`<h4>${c.usuario}</h4>
+      <p><b>Plano:</b> ${c.plano} - ${c.valor}</p>
+      <p><b>Cadastro:</b> ${c.dataCadastro}</p>
+      <p><b>Validade:</b> ${c.validade}</p>
+      <p><b>Pontos:</b> ${c.pontos}</p>
+      <p><b>Desafios:</b> ${c.desafios}</p>
+      <button onclick="apagarUsuario(${i})">Apagar Usuário</button>
+      <button onclick="iniciarChatAdmin('${c.usuario}')">Abrir Chat</button>`;
+    main.appendChild(div);
+  });
+}
+function sugestoesAdmin(main){
+  let lista=JSON.parse(localStorage.getItem("clientes")||"[]");
+  main.innerHTML="";
+  lista.forEach(c=>{
+    if(c.sugestoes.length){
+      let div=document.createElement("div"); div.className="card-admin";
+      div.innerHTML=`<h4>${c.usuario}</h4><ul>${c.sugestoes.map((s,idx)=>`<li>${s} <button onclick="apagarSugestao('${c.usuario}',${idx})">🗑️</button></li>`).join('')}</ul>`;
+      main.appendChild(div);
+    }
+  });
+}
+function duvidasAdmin(main){
+  let lista=JSON.parse(localStorage.getItem("clientes")||"[]");
+  main.innerHTML="";
+  lista.forEach(c=>{
+    if(c.duvidas.length){
+      let div=document.createElement("div"); div.className="card-admin";
+      div.innerHTML=`<h4>${c.usuario}</h4><ul>${c.duvidas.map((d,idx)=>`<li>${d} <button onclick="apagarDuvida('${c.usuario}',${idx})">🗑️</button></li>`).join('')}</ul>`;
+      main.appendChild(div);
+    }
+  });
+}
+function chatAdmin(main){
+  if(!usuarioChat){ main.innerHTML="<p>Selecione um usuário no dashboard para abrir chat.</p>"; return; }
+  let lista=JSON.parse(localStorage.getItem("clientes")||"[]");
+  let c=lista.find(u=>u.usuario===usuarioChat);
+  main.innerHTML=`
+    <div class="chat-box" id="chatBoxAdmin">
+      <div id="mensagensChatAdmin"></div>
+      <div class="chat-input">
+        <input id="mensagemInputAdmin" placeholder="Digite sua mensagem...">
+        <button onclick="enviarMensagemAdmin()">Enviar</button>
+        <button onclick="apagarChatAdmin()">🗑️ Apagar Chat</button>
+      </div>
+    </div>`;
+  atualizarChatAdmin();
+}
+
+// ---------- FUNÇÕES CLIENTE ----------
+function adicionarSugestao(){ let s=document.getElementById("novaSugestao").value.trim(); if(!s) return; clienteLogado.sugestoes.push(s); salvarCliente(clienteLogado); atualizarSugestoes(); }
+function atualizarSugestoes(){ let ul=document.getElementById("listaSugestoes"); if(!ul) return; ul.innerHTML=""; (clienteLogado.sugestoes||[]).forEach(s=>{ let li=document.createElement("li"); li.textContent=s; ul.appendChild(li); }); }
+function enviarDuvida(){ let d=document.getElementById("duvida").value.trim(); if(!d) return; clienteLogado.duvidas.push(d); salvarCliente(clienteLogado); alert("Dúvida enviada!"); }
+function renovarPlano(){ let hoje=new Date(); hoje.setDate(hoje.getDate()+30); clienteLogado.validade=hoje.toISOString().split("T")[0]; salvarCliente(clienteLogado); mostrarSecao("dashboardCliente"); }
+function enviarMensagemCliente(){ let msg=document.getElementById("mensagemInputCliente").value.trim(); if(!msg) return; clienteLogado.chat.push({de:"user",texto:msg}); salvarCliente(clienteLogado); atualizarChatCliente(); }
+function atualizarChatCliente(){ let div=document.getElementById("mensagensChatCliente"); div.innerHTML=""; (clienteLogado.chat||[]).forEach(m=>{ let d=document.createElement("div"); d.className="chat-message "+m.de; d.textContent=m.texto; div.appendChild(d); }); let box=document.getElementById("chatBoxCliente"); if(box) box.scrollTop=box.scrollHeight; }
+
+// ---------- FUNÇÕES ADMIN ----------
+function apagarUsuario(i){ if(!confirm("Deseja apagar este usuário?")) return; let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); lista.splice(i,1); localStorage.setItem("clientes",JSON.stringify(lista)); mostrarSecao("dashboardAdmin"); }
+function iniciarChatAdmin(usuario){ usuarioChat=usuario; mostrarSecao("chatAdmin"); }
+function atualizarChatAdmin(){ let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); let c=lista.find(u=>u.usuario===usuarioChat); if(!c) return; let div=document.getElementById("mensagensChatAdmin"); div.innerHTML=""; (c.chat||[]).forEach(m=>{ let d=document.createElement("div"); d.className="chat-message "+m.de; d.textContent=m.texto; div.appendChild(d); }); let box=document.getElementById("chatBoxAdmin"); if(box) box.scrollTop=box.scrollHeight; }
+function enviarMensagemAdmin(){ let msg=document.getElementById("mensagemInputAdmin").value.trim(); if(!msg) return; let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); let c=lista.find(u=>u.usuario===usuarioChat); c.chat.push({de:"admin",texto:msg}); localStorage.setItem("clientes",JSON.stringify(lista)); document.getElementById("mensagemInputAdmin").value=""; atualizarChatAdmin(); }
+function apagarChatAdmin(){ if(!confirm("Deseja apagar o chat desse usuário?")) return; let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); let c=lista.find(u=>u.usuario===usuarioChat); c.chat=[]; localStorage.setItem("clientes",JSON.stringify(lista)); atualizarChatAdmin(); }
+
+// ---------- APAGAR SUGESTÃO/DÚVIDA ----------
+function apagarSugestao(usuario,idx){ let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); let c=lista.find(u=>u.usuario===usuario); c.sugestoes.splice(idx,1); localStorage.setItem("clientes",JSON.stringify(lista)); mostrarSecao("sugestoesAdmin"); }
+function apagarDuvida(usuario,idx){ let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); let c=lista.find(u=>u.usuario===usuario); c.duvidas.splice(idx,1); localStorage.setItem("clientes",JSON.stringify(lista)); mostrarSecao("duvidasAdmin"); }
+
+// ---------- UTILITÁRIOS ----------
+function salvarCliente(c){ let lista=JSON.parse(localStorage.getItem("clientes")||"[]"); let idx=lista.findIndex(cli=>cli.usuario===c.usuario); if(idx!==-1) lista[idx]=c; localStorage.setItem("clientes",JSON.stringify(lista)); }
+function sair(){ clienteLogado=null; usuarioChat=null; modoAdmin=false; document.getElementById("painel").style.display="none"; document.getElementById("loginCard").style.display="block"; document.getElementById("usuario").value=""; document.getElementById("senha").value=""; }
+function toggleTema(){ document.body.classList.toggle("dark"); }
+</script>
+</body>
+</html>
